@@ -148,7 +148,7 @@ app.get("/logout", (req, res) => {
 
 app.get("/admin", isLoggedIn, isAdminRole, async (req, res) => {
   const users = await userCollection.find().toArray();
-  res.render("admin", { user: req.session.user, users });
+  res.render("admin", { currentUser: req.session.user, users });
 });
 
 app.post("/admin/promote", isLoggedIn, isAdminRole, async (req, res) => {
