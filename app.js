@@ -43,6 +43,8 @@ app.use(
   }),
 );
 
+app.set('view engine', 'ejs');
+
 app.get("/", (req, res) => {
   if (req.session.user) {
     res.send(`
