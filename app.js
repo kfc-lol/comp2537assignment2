@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const session = require("express-session");
-const MongoStore = require('connect-mongo').MongoStore;
+const MongoStore = require("connect-mongo").MongoStore;
 const bcrypt = require("bcrypt");
 const Joi = require("joi");
 const { MongoClient } = require("mongodb");
@@ -27,6 +27,7 @@ connectDB().catch(console.error);
 // Middleware
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static("public"));
+app.set("view engine", "ejs");
 
 app.use(
   session({
@@ -43,41 +44,22 @@ app.use(
   }),
 );
 
-app.set('view engine', 'ejs');
+const isLoggedIn = (req, res, next) => {
+  if (req.session && req.session.user) return next();
+  res.redirect("/login");
+};
+
+const isAdminRole = (req, res, next) => {
+  if (req.session && req.session.user.user_type === "admin") return next();
+  res.status(403).render("403", { user: req.session.user });
+};
 
 app.get("/", (req, res) => {
-  if (req.session.user) {
-    res.send(`
-      <h1>Hello, ${req.session.user.name}!</h1>
-      <a href="/members"><button>Go to Members Area</button></a><br><br>
-      <a href="/logout"><button>Logout</button></a>
-    `);
-  } else {
-    res.send(`
-      <h1>Home</h1>
-      <a href="/signup">
-        <button>Sign up</button>
-      </a>
-      </br>
-      <a href="/login"><button>Log In</button></a>
-    `);
-  }
+  res.render("index", { user: req.session.user || null });
 });
 
 app.get("/signup", (req, res) => {
-  res.send(`
-    <h2>Create User</h2>
-    <form action="/signupSubmit" method="POST">
-      <input name="name" placeholder="Name" required />
-      </br>
-      <input name="email" type="email" placeholder="Email" required />
-      </br>
-      <input name="password" type="password" placeholder="Password" required />
-      </br>
-      <button type="submit">Submit</button>
-    </form>
-    <a href="/"><button>Back</button></a>
-  `);
+  res.render("signup", { user: null, error: null });
 });
 
 app.post("/signupSubmit", async (req, res) => {
@@ -92,42 +74,31 @@ app.post("/signupSubmit", async (req, res) => {
 
   const { error } = schema.validate({ name, email, password });
   if (error) {
-    const msg = error.details[0].message;
-    return res.send(`
-      <p>${msg}</p>
-      <a href="/signup">Try Again</a>
-    `);
+    const field = error.details[0].context.key; // tells you WHICH field failed
+    let msg = "Invalid input.";
+    if (field === "name") msg = "Name is invalid.";
+    if (field === "email") msg = "Please provide a valid email address.";
+    if (field === "password") msg = "Password is invalid.";
+    return res.render("signup", {
+      user: null,
+      error: msg
+    })
   }
 
-  // Field-specific missing messages
-  if (!name)
-    return res.send('<p>Name is required.</p><a href="/signup">Try Again</a>');
-  if (!email)
-    return res.send(
-      '<p>Please provide an email address.</p><a href="/signup">Try Again</a>',
-    );
-  if (!password)
-    return res.send(
-      '<p>Password is required.</p><a href="/signup">Try Again</a>',
-    );
-
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-  await userCollection.insertOne({ name, email, password: hashedPassword });
+  await userCollection.insertOne({
+    name,
+    email,
+    password: hashedPassword,
+    user_type: "user",
+  });
 
-  req.session.user = { name, email };
+  req.session.user = { name, email, user_type: "user" };
   res.redirect("/members");
 });
 
 app.get("/login", (req, res) => {
-  res.send(`
-    <h2>Log In</h2>
-    <form action="/loginSubmit" method="POST">
-      <input name="email" type="email" placeholder="Email" required /><br>
-      <input name="password" type="password" placeholder="Password" required /><br>
-      <button type="submit">Submit</button>
-    </form>
-    <a href="/"><button>Back</button></a>
-  `);
+  res.render("login", { user: null, error: null });
 });
 
 app.post("/loginSubmit", async (req, res) => {
@@ -140,43 +111,34 @@ app.post("/loginSubmit", async (req, res) => {
 
   const { error } = schema.validate({ email, password });
   if (error) {
-    return res.send(`<p>Invalid input.</p><a href="/login">Try Again</a>`);
+    return res.render("login", { user: null, error: "Invalid input." });
   }
 
   const user = await userCollection.findOne({ email });
   if (!user) {
-    return res.send(
-      `<p>Invalid email/password combination.</p><a href="/login">Try Again</a>`,
-    );
+    return res.render("login", {
+      user: null,
+      error: "Invalid email/password combination.",
+    });
   }
 
   const match = await bcrypt.compare(password, user.password);
   if (!match) {
-    return res.send(
-      `<p>Invalid email/password combination.</p><a href="/login">Try Again</a>`,
-    );
+    return res.render("login", {
+      user: null,
+      error: "Invalid email/password combination",
+    });
   }
 
-  req.session.user = { name: user.name, email: user.email };
+  req.session.user = { name: user.name, email: user.email, user_type: user.user_type };
   res.redirect("/members");
 });
 
 // Members only – GET
-app.get("/members", (req, res) => {
-  if (!req.session.user) {
-    return res.redirect("/");
-  }
-
+app.get("/members", isLoggedIn, (req, res) => {
   const images = ["hi.gif", "neutral.jpg", "oh-you-again.jpg"];
-  const randomImage = images[Math.floor(Math.random() * images.length)];
 
-  res.send(`
-    <h1>Hello, ${req.session.user.name}.</h1>
-    <img src="/${randomImage}" alt="random image" style="max-width:600px;" />
-    </br>
-    </br>
-    <a href="/logout"><button>Sign Out</button></a>
-  `);
+  res.render("members", { user: req.session.user, images });
 });
 
 app.get("/logout", (req, res) => {
@@ -184,8 +146,29 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
+app.get("/admin", isLoggedIn, isAdminRole, async (req, res) => {
+  const users = await userCollection.find().toArray();
+  res.render("admin", { user: req.session.user, users });
+});
+
+app.post("/admin/promote", isLoggedIn, isAdminRole, async (req, res) => {
+  await userCollection.updateOne(
+    { email: req.body.email },
+    { $set: { user_type: "admin" } }
+  );
+  res.redirect("/admin");
+});
+ 
+app.post("/admin/demote", isLoggedIn, isAdminRole, async (req, res) => {
+  await userCollection.updateOne(
+    { email: req.body.email },
+    { $set: { user_type: "user" } }
+  );
+  res.redirect("/admin");
+});
+
 app.use((req, res) => {
-  res.status(404).send('<h1>Page not found - 404</h1>');
+  res.status(404).render("404");
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

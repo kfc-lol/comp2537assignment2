@@ -1,5 +1,5 @@
 {
-  "name": "comp2537-assignment1",
+  "name": "comp2537-assignment2",
   "version": "1.0.0",
   "main": "app.js",
   "scripts": {
@@ -9,9 +9,10 @@
     "bcrypt": "^6.0.0",
     "connect-mongo": "^6.0.0",
     "dotenv": "^17.4.2",
+    "ejs": "^5.0.2",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "joi": "^18.1.2",
+    "joi": "^18.2.1",
     "mongodb": "^7.2.0"
   }
 }

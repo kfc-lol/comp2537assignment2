@@ -1,0 +1,20 @@
+<%- include('templates/header') %>
+<h2>Admin Page</h2>
+<table>
+    <% users.forEach(user => { %>
+        <tr>
+        <td>
+            <%= user.name %> (<%= user.user_type %>)
+             <form action="/admin/promote" method="POST" class="d-inline">
+                <input type="hidden" name="email" value="<%= user.email %>">
+                <button type="submit" class="btn btn-sm rounded-5 btn-danger">Promote to Admin</button>
+            </form>
+            <form action="/admin/demote" method="POST" class="d-inline">
+                <input type="hidden" name="email" value="<%= user.email %>">
+                <button type="submit" class="btn btn-sm rounded-5 btn-success">Demote to User</button>
+            </form>
+        </td>
+        </tr>
+    <% }); %>
+</table>
+<%- include('templates/footer') %>
