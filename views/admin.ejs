@@ -4,7 +4,7 @@
     <% users.forEach(user => { %>
         <tr>
         <td>
-            <%= user.name %> (<%= user.user_type %>)
+            <%- include('templates/user')%>
             <form action="/admin/promote" method="POST" class="d-inline">
                 <input type="hidden" name="email" value="<%= user.email %>">
                 <button type="submit" class="btn btn-sm rounded-5 btn-danger">Promote to Admin</button>
